@@ -1,0 +1,59 @@
+DirectoryIndex index.html
+Options -Indexes -MultiViews
+ServerSignature Off
+
+<IfModule mod_dir.c>
+  DirectorySlash On
+</IfModule>
+
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+  Header always unset X-Powered-By
+  Header unset ETag
+</IfModule>
+FileETag None
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # Block HTTP TRACE / TRACK methods
+  RewriteCond %{REQUEST_METHOD} ^(TRACE|TRACK) [NC]
+  RewriteRule .* - [F,L]
+
+  # Block accidental hidden directories (.git, .env, etc.)
+  RewriteRule "(^|/)\." - [F,L]
+
+  # Pass Authorization header through Apache to PHP
+  RewriteCond %{HTTP:Authorization} ^(.*)
+  RewriteRule .* - [e=HTTP_AUTHORIZATION:%1]
+
+  # Optional /api/<action> fallback routing to api.php
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^api/([a-zA-Z0-9_]+)$ api.php?action=$1 [QSA,L]
+</IfModule>
+
+# Protect internal backend config, mail, database scripts, local secrets, and SQL dumps from HTTP download
+<FilesMatch "^(config\.php|config\.local\.php|config\.local\.example\.php|db\.php|mail\.php|database\.sql|schema\.sql|composer\.json|composer\.lock|package\.json|tsconfig\.json)$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+
+# Deny dotfiles, SQL dumps, backups, logs, source maps, and uncompiled source files
+<FilesMatch "(^\.|\.(sql|sqlite|db|log|bak|old|orig|tmp|swp|ini|env|yml|yaml|md|sh|map|ts|tsx|json)$)">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
